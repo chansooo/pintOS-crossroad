@@ -176,11 +176,12 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 	
 	is_position_enter_intersection(vi->position);
 
-//	is_position_out_intersection(vi->position);
+	is_position_out_intersection(vi->position);
 	//sema_up(moveSema);
 	
 	return 1;
 }
+
 
 void init_on_mainthread(int thread_cnt){
 	/* Called once before spawning threads */
