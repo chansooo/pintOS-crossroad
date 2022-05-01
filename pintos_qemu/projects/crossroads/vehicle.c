@@ -182,8 +182,8 @@ void init_on_mainthread(int thread_cnt){
 	sema_init(csSema, 1);
 	sema_init(intersectionSema, 1);
 	sema_init(moveSema, 1);
-	intersectionTake1->interTakeCount =0;
-	intersectionTake1->TakePath =0;
+//	intersectionTake1->interTakeCount =0;
+//	intersectionTake1->TakePath =0;
 //	intersectionTake1 = (0,0);
 }
 
