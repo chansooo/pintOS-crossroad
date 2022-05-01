@@ -172,7 +172,7 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 	/* update position */
 	vi->position = pos_next;
 	
-	is_position_out_intersection(vi->position);
+//	is_position_out_intersection(vi->position);
 	sema_up(moveSema);
 	
 	return 1;
@@ -186,8 +186,8 @@ void init_on_mainthread(int thread_cnt){
 	sema_init(csSema, 1);
 	sema_init(intersectionSema, 1);
 	sema_init(moveSema, 1);
-//	intersectionTake1->interTakeCount =0;
-//	intersectionTake1->TakePath =0;
+	intersectionTake1.interTakeCount =0;
+	intersectionTake1.TakePath =0;
 //	intersectionTake1 = (0,0);
 }
 
