@@ -176,6 +176,9 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 
 void init_on_mainthread(int thread_cnt){
 	/* Called once before spawning threads */
+	csSema = malloc(sizeof (struct semaphore));
+	intersectionSema = malloc(sizeof (struct semaphore));
+	moveSema = malloc(sizeof (struct semaphore));
 	sema_init(csSema, 1);
 	sema_init(intersectionSema, 1);
 	sema_init(moveSema, 1);
