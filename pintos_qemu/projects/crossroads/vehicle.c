@@ -1,11 +1,13 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "threads/thread.h"
 #include "threads/synch.h"
 #include "projects/crossroads/vehicle.h"
 #include "projects/crossroads/map.h"
 #include "projects/crossroads/ats.h"
+
 struct intersectionTake
 {
 	int TakePath; //a, b, c, d에서 출발하는 애들 중 어떤 출발점이 선점할 건지
