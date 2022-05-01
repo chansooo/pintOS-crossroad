@@ -77,23 +77,23 @@ static void is_position_enter_intersection(struct position a){
 		sema_down(csSema);
 		if(intersectionTake1.interTakeCount <= 0){ //교차로에 차 없으면
 			if(a.col == 1 && a.row == 4){ //A에서 교차로 진입
+				sema_down(intersectionSema);
 				intersectionTake1.TakePath = 1;
 				intersectionTake1.interTakeCount++;
-				sema_down(intersectionSema);
 			} else if(a.col == 4 && a.row == 5){ //B에서 교차로 진입
+				sema_down(intersectionSema);
 				intersectionTake1.TakePath = 2;
 				intersectionTake1.interTakeCount++;
-				sema_down(intersectionSema);
 			} else if(a.col == 5 && a.row == 2){ //C에서 교차로 진입
+				sema_down(intersectionSema);
 				intersectionTake1.TakePath = 3;
 				intersectionTake1.interTakeCount++;
-				sema_down(intersectionSema);
 			} else if(a.col == 2 && a.row == 1){ // D에서 교차로 진입
+				sema_down(intersectionSema);
 				intersectionTake1.TakePath = 4;
 				intersectionTake1.interTakeCount++;
-				sema_down(intersectionSema);
 			}
-			sema_up(csSema);	
+			sema_up(csSema);
 		} else{ //교차로에 차 있으면 있는 차 어떤 출발점인지 보고 같은 출발점이면 출발, 아니면 semadown
 			//A 출발 차가 교차로 먹고 들어오는 차도 A에서 출발일 때
 			if(intersectionTake1.TakePath == 1 && a.col == 1 && a.row == 4){
@@ -111,6 +111,16 @@ static void is_position_enter_intersection(struct position a){
 			} else{ //같은 출발지점이 아닐 때
 				sema_up(csSema);
 				sema_down(intersectionSema);
+				//intersectionSema 선점했으면 takePath 값 바꿔주기
+				if(a.col == 1 && a.row == 4){
+					intersectionTake1.TakePath = 1;
+				} else if(a.col == 4 && a.row == 5){
+					intersectionTake1.TakePath = 2;
+				}else if(a.col == 5 && a.row == 2){
+					intersectionTake1.TakePath = 3;
+				}else if(a.col == 2 && a.row == 1){
+					intersectionTake1.TakePath = 4;
+				}
 			}
 		
 		}
