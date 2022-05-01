@@ -69,7 +69,7 @@ const struct position vehicle_path[4][4][10] = {
 
 //옮길 좌표가 intersection 들어가기 직전인 네 곳이라면
 //intersectiontake의 값들로 선점한 아이들 표시
-static int is_position_enter_intersection(struct position a){
+static void is_position_enter_intersection(struct position a){
 	//D에서 교차로 진입
 	sema_down(csSema);
 	if(intersectionTake1->interTakeCount <= 0){ //교차로에 차 없으면
@@ -105,7 +105,7 @@ static int is_position_enter_intersection(struct position a){
 	sema_up(csSema);
 }
 //intersection 빠져나갈 때 count--해주고 
-static int is_position_out_intersection(struct position a){
+static void is_position_out_intersection(struct position a){
 	sema_down(csSema);
 	//차가 교차로 빠져나갈려고 하면 count 1씩 빼줌
 	if(a.col == 1 && a.row == 2){ //A로 들어가는 차
