@@ -154,12 +154,14 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 		}
 	}
 
-	sema_down(moveSema);
+	
 	is_position_enter_intersection(vi->position);
+	
+	sema_down(moveSema);
 	/* lock next position */
 	//다음으로 갈 애 잠궈버려서 못 가도록
 	lock_acquire(&vi->map_locks[pos_next.row][pos_next.col]);
-
+	
 	if (vi->state == VEHICLE_STATUS_READY) {
 		/* start this vehicle */
 		vi->state = VEHICLE_STATUS_RUNNING;
