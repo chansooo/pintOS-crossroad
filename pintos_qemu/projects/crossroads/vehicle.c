@@ -20,7 +20,7 @@ struct semaphore *csSema;
 struct semaphore *intersectionSema; //
 struct semaphore *moveSema;
 //struct semaphore *waitsignSema;
-struct intersectionTake *intersectionTake1;
+struct intersectionTake intersectionTake1;
 
 
 /* path. A:0 B:1 C:2 D:3 */
@@ -74,29 +74,29 @@ const struct position vehicle_path[4][4][10] = {
 static void is_position_enter_intersection(struct position a){
 	//D에서 교차로 진입
 	sema_down(csSema);
-	if(intersectionTake1->interTakeCount <= 0){ //교차로에 차 없으면
+	if(intersectionTake1.interTakeCount <= 0){ //교차로에 차 없으면
 		if(a.col == 1 && a.row == 4){ //A에서 교차로 진입
-			intersectionTake1->TakePath = 1;
-			intersectionTake1->interTakeCount++;
+			intersectionTake1.TakePath = 1;
+			intersectionTake1.interTakeCount++;
 		} else if(a.col == 4 && a.row == 5){ //B에서 교차로 진입
-			intersectionTake1->TakePath = 2;
-			intersectionTake1->interTakeCount++;
+			intersectionTake1.TakePath = 2;
+			intersectionTake1.interTakeCount++;
 		} else if(a.col == 5 && a.row == 2){ //C에서 교차로 진입
-			intersectionTake1->TakePath = 3;
-			intersectionTake1->interTakeCount++;
+			intersectionTake1.TakePath = 3;
+			intersectionTake1.interTakeCount++;
 		} else if(a.col == 2 && a.row == 1){ // D에서 교차로 진입
-			intersectionTake1->TakePath = 4;
-			intersectionTake1->interTakeCount++;
+			intersectionTake1.TakePath = 4;
+			intersectionTake1.interTakeCount++;
 		}
 	} else{ //교차로에 차 있으면 있는 차 어떤 출발점인지 보고 같은 출발점이면 출발, 아니면 semadown
 		//A 출발 차가 교차로 먹고 들어오는 차도 A에서 출발일 때
-		if(intersectionTake1->TakePath == 1 && a.col == 1 && a.row == 4){
+		if(intersectionTake1.TakePath == 1 && a.col == 1 && a.row == 4){
 			
-		}else if(intersectionTake1->TakePath == 2 && a.col == 4 && a.row == 5){
+		}else if(intersectionTake1.TakePath == 2 && a.col == 4 && a.row == 5){
 			
-		}else if(intersectionTake1->TakePath == 3 && a.col == 5 && a.row == 2){
+		}else if(intersectionTake1.TakePath == 3 && a.col == 5 && a.row == 2){
 			
-		} else if(intersectionTake1->TakePath == 4 && a.col == 2 && a.row == 1){
+		} else if(intersectionTake1.TakePath == 4 && a.col == 2 && a.row == 1){
 			
 		} else{ //같은 출발지점이 아닐 때
 			sema_up(csSema);
@@ -111,16 +111,16 @@ static void is_position_out_intersection(struct position a){
 	sema_down(csSema);
 	//차가 교차로 빠져나갈려고 하면 count 1씩 빼줌
 	if(a.col == 1 && a.row == 2){ //A로 들어가는 차
-		intersectionTake1->interTakeCount--;
+		intersectionTake1.interTakeCount--;
 	} else if(a.col == 4 && a.row == 5){  //B로 들어가는 차
-		intersectionTake1->interTakeCount--;
+		intersectionTake1.interTakeCount--;
 	}else if(a.col == 5 && a.row == 2){  //B로 들어가는 차
-		intersectionTake1->interTakeCount--;
+		intersectionTake1.interTakeCount--;
 	}else if(a.col == 2 && a.row == 1){  //B로 들어가는 차
-		intersectionTake1->interTakeCount--;
+		intersectionTake1.interTakeCount--;
 	}
 
-	if(intersectionTake1->interTakeCount == 0){
+	if(intersectionTake1.interTakeCount == 0){
 		sema_up(intersectionSema);
 	}
 	sema_up(csSema);
