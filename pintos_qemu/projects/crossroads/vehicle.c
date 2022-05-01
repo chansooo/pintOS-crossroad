@@ -103,7 +103,6 @@ static void is_position_enter_intersection(struct position a){
 		} else{ //같은 출발지점이 아닐 때
 			sema_up(csSema);
 			sema_down(intersectionSema);
-			
 		}
 		
 	}
@@ -159,7 +158,7 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 	
 	
 	
-	//sema_down(moveSema);
+	sema_down(moveSema);
 	/* lock next position */
 	//다음으로 갈 애 잠궈버려서 못 가도록
 	lock_acquire(&vi->map_locks[pos_next.row][pos_next.col]);
@@ -177,7 +176,7 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 	is_position_enter_intersection(vi->position);
 
 	is_position_out_intersection(vi->position);
-	//sema_up(moveSema);
+	sema_up(moveSema);
 	
 	return 1;
 }
@@ -213,6 +212,7 @@ void vehicle_loop(void *_vi)
 	while (1) {
 		/* vehicle main code */
 		res = try_move(start, dest, step, vi);
+
 		if (res == 1) {
 			step++;
 		}
