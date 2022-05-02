@@ -16,16 +16,27 @@ struct intersectionTake
 						//0이 되면 얘 감싸는 세마포어 풀어주기
 };
 
+struct lock **intersection_locks;
+
 struct semaphore *csSema;
 struct semaphore *intersectionSema; //
-struct semaphore *abSema;
-struct semaphore *bcSema;
-struct semaphore *cdSema;
-struct semaphore *daSema;
 
 //struct semaphore *waitsignSema;
 static struct intersectionTake intersectionTake1;
 
+
+void init_intersection_map_locks(struct lock ***intersection_locks){
+	int i, j;
+	struct lock **__map_locks;
+
+	__map_locks = *intersection_locks = malloc(sizeof (struct lock *) * 7);
+	for (i=0; i<7; i++) {
+		__map_locks[i] = malloc(sizeof (struct lock) * 7);
+		for (j=0; j<7; j++) {
+			lock_init(&__map_locks[i][j]);
+		}
+	}
+}
 
 /* path. A:0 B:1 C:2 D:3 */
 const struct position vehicle_path[4][4][10] = {
@@ -82,59 +93,59 @@ static void is_position_enter_intersection(struct vehicle_info *vi){
 	sema_down(intersectionSema);
 	if(vi->start == 'A'){
 		if(vi->dest == 'B'){
-			lock_acquire(&vi->intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[2][4]);
 		} else if(vi->dest == 'C'){
-			lock_acquire(&vi->intersection_locks[2][4]);
-			lock_acquire(&vi->intersection_locks[3][4]);
-			lock_acquire(&vi->intersection_locks[4][4]);
+			lock_acquire(&intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[3][4]);
+			lock_acquire(&intersection_locks[4][4]);
 		} else if(vi->dest == 'D'){
-			lock_acquire(&vi->intersection_locks[2][4]);
-			lock_acquire(&vi->intersection_locks[3][4]);
-			lock_acquire(&vi->intersection_locks[4][4]);
-			lock_acquire(&vi->intersection_locks[4][3]);
-			lock_acquire(&vi->intersection_locks[4][2]);
+			lock_acquire(&intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[3][4]);
+			lock_acquire(&intersection_locks[4][4]);
+			lock_acquire(&intersection_locks[4][3]);
+			lock_acquire(&intersection_locks[4][2]);
 		}
 	} else if(vi->start == 'B'){
 		if(vi->dest == 'A'){
-			lock_acquire(&vi->intersection_locks[4][4]);
-			lock_acquire(&vi->intersection_locks[4][3]);
-			lock_acquire(&vi->intersection_locks[4][2]);
-			lock_acquire(&vi->intersection_locks[3][2]);
-			lock_acquire(&vi->intersection_locks[2][2]);
+			lock_acquire(&intersection_locks[4][4]);
+			lock_acquire(&intersection_locks[4][3]);
+			lock_acquire(&intersection_locks[4][2]);
+			lock_acquire(&intersection_locks[3][2]);
+			lock_acquire(&intersection_locks[2][2]);
 		} else if(vi->dest == 'C'){
-			lock_acquire(&vi->intersection_locks[4][4]);
+			lock_acquire(&intersection_locks[4][4]);
 		} else if(vi->dest == 'D'){
-			lock_acquire(&vi->intersection_locks[4][4]);
-			lock_acquire(&vi->intersection_locks[3][4]);
-			lock_acquire(&vi->intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[4][4]);
+			lock_acquire(&intersection_locks[3][4]);
+			lock_acquire(&intersection_locks[2][4]);
 		}
 	} else if(vi->start == 'C'){
 		if(vi->dest == 'A'){
-			lock_acquire(&vi->intersection_locks[4][2]);
-			lock_acquire(&vi->intersection_locks[3][2]);
-			lock_acquire(&vi->intersection_locks[2][2]);
+			lock_acquire(&intersection_locks[4][2]);
+			lock_acquire(&intersection_locks[3][2]);
+			lock_acquire(&intersection_locks[2][2]);
 		} else if(vi->dest == 'B'){
-			lock_acquire(&vi->intersection_locks[4][2]);
-			lock_acquire(&vi->intersection_locks[3][2]);
-			lock_acquire(&vi->intersection_locks[2][2]);
-			lock_acquire(&vi->intersection_locks[2][3]);
-			lock_acquire(&vi->intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[4][2]);
+			lock_acquire(&intersection_locks[3][2]);
+			lock_acquire(&intersection_locks[2][2]);
+			lock_acquire(&intersection_locks[2][3]);
+			lock_acquire(&intersection_locks[2][4]);
 		} else if(vi->dest == 'D'){
-			lock_acquire(&vi->intersection_locks[4][2]);
+			lock_acquire(&intersection_locks[4][2]);
 		}
 	} else if(vi->start =='D'){
 		if(vi->dest == 'A'){
-			lock_acquire(&vi->intersection_locks[2][2]);
+			lock_acquire(&intersection_locks[2][2]);
 		} else if(vi->dest == 'B'){
-			lock_acquire(&vi->intersection_locks[2][2]);
-			lock_acquire(&vi->intersection_locks[3][2]);
-			lock_acquire(&vi->intersection_locks[4][2]);
+			lock_acquire(&intersection_locks[2][2]);
+			lock_acquire(&intersection_locks[3][2]);
+			lock_acquire(&intersection_locks[4][2]);
 		} else if(vi->dest == 'C'){
-			lock_acquire(&vi->intersection_locks[2][2]);
-			lock_acquire(&vi->intersection_locks[2][4]);
-			lock_acquire(&vi->intersection_locks[2][4]);
-			lock_acquire(&vi->intersection_locks[2][4]);
-			lock_acquire(&vi->intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[2][2]);
+			lock_acquire(&intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[2][4]);
 		}
 	}
 	sema_up(intersectionSema);
@@ -144,59 +155,59 @@ static void is_position_out_intersection(struct vehicle_info *vi){
 		sema_down(intersectionSema);
 	if(vi->start == 'A'){
 		if(vi->dest == 'B'){
-			lock_acquire(&vi->intersection_locks[2][4]);
+			lock_acquire(&intersection_locks[2][4]);
 		} else if(vi->dest == 'C'){
-			lock_release(&vi->intersection_locks[2][4]);
-			lock_release(&vi->intersection_locks[3][4]);
-			lock_release(&vi->intersection_locks[4][4]);
+			lock_release(&intersection_locks[2][4]);
+			lock_release(&intersection_locks[3][4]);
+			lock_release(&intersection_locks[4][4]);
 		} else if(vi->dest == 'D'){
-			lock_release(&vi->intersection_locks[2][4]);
-			lock_release(&vi->intersection_locks[3][4]);
-			lock_release(&vi->intersection_locks[4][4]);
-			lock_release(&vi->intersection_locks[4][3]);
-			lock_release(&vi->intersection_locks[4][2]);
+			lock_release(&intersection_locks[2][4]);
+			lock_release(&intersection_locks[3][4]);
+			lock_release(&intersection_locks[4][4]);
+			lock_release(&intersection_locks[4][3]);
+			lock_release(&intersection_locks[4][2]);
 		}
 	} else if(vi->start == 'B'){
 		if(vi->dest == 'A'){
-			lock_release(&vi->intersection_locks[4][4]);
-			lock_release(&vi->intersection_locks[4][3]);
-			lock_release(&vi->intersection_locks[4][2]);
-			lock_release(&vi->intersection_locks[3][2]);
-			lock_release(&vi->intersection_locks[2][2]);
+			lock_release(&intersection_locks[4][4]);
+			lock_release(&intersection_locks[4][3]);
+			lock_release(&intersection_locks[4][2]);
+			lock_release(&intersection_locks[3][2]);
+			lock_release(&intersection_locks[2][2]);
 		} else if(vi->dest == 'C'){
-			lock_release(&vi->intersection_locks[4][4]);
+			lock_release(&intersection_locks[4][4]);
 		} else if(vi->dest == 'D'){
-			lock_release(&vi->intersection_locks[4][4]);
-			lock_release(&vi->intersection_locks[3][4]);
-			lock_release(&vi->intersection_locks[2][4]);
+			lock_release(&intersection_locks[4][4]);
+			lock_release(&intersection_locks[3][4]);
+			lock_release(&intersection_locks[2][4]);
 		}
 	} else if(vi->start == 'C'){
 		if(vi->dest == 'A'){
-			lock_release(&vi->intersection_locks[4][2]);
-			lock_release(&vi->intersection_locks[3][2]);
-			lock_release(&vi->intersection_locks[2][2]);
+			lock_release(&intersection_locks[4][2]);
+			lock_release(&intersection_locks[3][2]);
+			lock_release(&intersection_locks[2][2]);
 		} else if(vi->dest == 'B'){
-			lock_release(&vi->intersection_locks[4][2]);
-			lock_release(&vi->intersection_locks[3][2]);
-			lock_release(&vi->intersection_locks[2][2]);
-			lock_release(&vi->intersection_locks[2][3]);
-			lock_release(&vi->intersection_locks[2][4]);
+			lock_release(&intersection_locks[4][2]);
+			lock_release(&intersection_locks[3][2]);
+			lock_release(&intersection_locks[2][2]);
+			lock_release(&intersection_locks[2][3]);
+			lock_release(&intersection_locks[2][4]);
 		} else if(vi->dest == 'D'){
-			lock_release(&vi->intersection_locks[4][2]);
+			lock_release(&intersection_locks[4][2]);
 		}
 	} else if(vi->start =='D'){
 		if(vi->dest == 'A'){
-			lock_release(&vi->intersection_locks[2][2]);
+			lock_release(&intersection_locks[2][2]);
 		} else if(vi->dest == 'B'){
-			lock_release(&vi->intersection_locks[2][2]);
-			lock_release(&vi->intersection_locks[3][2]);
-			lock_release(&vi->intersection_locks[4][2]);
+			lock_release(&intersection_locks[2][2]);
+			lock_release(&intersection_locks[3][2]);
+			lock_release(&intersection_locks[4][2]);
 		} else if(vi->dest == 'C'){
-			lock_release(&vi->intersection_locks[2][2]);
-			lock_release(&vi->intersection_locks[2][4]);
-			lock_release(&vi->intersection_locks[2][4]);
-			lock_release(&vi->intersection_locks[2][4]);
-			lock_release(&vi->intersection_locks[2][4]);
+			lock_release(&intersection_locks[2][2]);
+			lock_release(&intersection_locks[2][4]);
+			lock_release(&intersection_locks[2][4]);
+			lock_release(&intersection_locks[2][4]);
+			lock_release(&intersection_locks[2][4]);
 		}
 	}
 	sema_up(intersectionSema);
@@ -255,22 +266,14 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 }
 
 
+
 void init_on_mainthread(int thread_cnt){
 	/* Called once before spawning threads */
 	csSema = malloc(sizeof (struct semaphore));
 	intersectionSema = malloc(sizeof (struct semaphore));
-	daSema = malloc(sizeof (struct semaphore));
-	abSema = malloc(sizeof (struct semaphore));
-	bcSema = malloc(sizeof (struct semaphore));
-	cdSema = malloc(sizeof (struct semaphore));
 	sema_init(csSema, 1);
 	sema_init(intersectionSema, 1);
-	sema_init(daSema, 1);
-	sema_init(abSema, 1);
-	sema_init(bcSema, 1);
-	sema_init(cdSema, 1);
-	intersectionTake1.interTakeCount =0;
-	intersectionTake1.TakePath =0;
+	init_intersection_map_locks(&intersection_locks);
 }
 
 void vehicle_loop(void *_vi)
