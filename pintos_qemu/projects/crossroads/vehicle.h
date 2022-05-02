@@ -14,7 +14,7 @@ struct vehicle_info {
 	char dest;
 	struct position position;
 	struct lock **map_locks;
-	struct lock **intersection_locks;
+//	struct lock **intersection_locks;
 };
 
 void vehicle_loop(void *vi);
