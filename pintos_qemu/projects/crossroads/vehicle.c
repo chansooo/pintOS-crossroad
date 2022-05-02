@@ -256,10 +256,14 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 	}
 	/* update position */
 	vi->position = pos_next;
+	if((vi->position.col == 1 && vi->position.row == 4)||(vi->position.col == 4 && vi->position.row == 5)||(vi->position.col == 5 && vi->position.row == 2)||(vi->position.col == 2 && vi->position.row == 1)){
+		is_position_enter_intersection(&vi);
+	}
+	if((vi->position.col == 1 && vi->position.row == 2)||(vi->position.col == 2 && vi->position.row == 5)||(vi->position.col == 5 && vi->position.row == 4)||(vi->position.col == 4 && vi->position.row == 1)){
+		is_position_out_intersection(&vi);
+	}
 
-	is_position_enter_intersection(&vi);
-
-	is_position_out_intersection(&vi);
+	
 
 	
 	return 1;
