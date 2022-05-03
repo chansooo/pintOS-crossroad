@@ -1,6 +1,5 @@
 
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "threads/thread.h"
 #include "threads/synch.h"
@@ -8,6 +7,8 @@
 #include "projects/crossroads/map.h"
 #include "projects/crossroads/ats.h"
 
+<<<<<<< HEAD
+=======
 struct intersectionTake
 {
 	int TakePath; //a, b, c, d에서 출발하는 애들 중 어떤 출발점이 선점할 건지
@@ -21,6 +22,7 @@ struct semaphore *intersectionSema; //
 struct semaphore *moveSema;
 //struct semaphore *waitsignSema;
 static struct intersectionTake intersectionTake1;
+>>>>>>> main
 
 
 /* path. A:0 B:1 C:2 D:3 */
@@ -67,6 +69,8 @@ const struct position vehicle_path[4][4][10] = {
 	}
 };
 
+<<<<<<< HEAD
+=======
 
 
 //옮길 좌표가 intersection 들어가기 직전인 네 곳이라면
@@ -150,24 +154,72 @@ static void is_position_out_intersection(struct position a){
 	
 }
 
+>>>>>>> main
 static int is_position_outside(struct position pos)
 {
 	return (pos.row == -1 || pos.col == -1);
 }
 
-/* return 0:termination, 1:success, -1:fail */
-// vehicle 이동하는 함수
-static int try_move(int start, int dest, int step, struct vehicle_info *vi)
+static int is_position_crossroad(struct position pos)
 {
-	//현재 위치, 다음 위치 받아옴
-	struct position pos_cur, pos_next;
+	return (2 <= pos.row && pos.row <= 4) && (2 <= pos.col && pos.col <= 4);
+}
 
-	pos_next = vehicle_path[start][dest][step];
+static void release_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi)
+{
+	struct position pos_prev = vehicle_path[start][dest][step-1];
+
+	/* release cur to all prev crossroad path */
+	if (is_position_crossroad(pos_cur)) {
+		/* release current path */
+		if (lock_held_by_current_thread(&vi->map_locks[pos_cur.row][pos_cur.col])) {
+			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+		}
+		/* release prev path */
+		release_lock_crossroad(pos_prev, start, dest, step-1, vi);
+	}
+}
+
+static int try_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi)
+{
+	struct position pos_next = vehicle_path[start][dest][step+1];
+
+	if (!is_position_crossroad(pos_cur)) {
+		/* next is not crossroad: we came to the point where all crossroad path locked */
+		return 1;
+	}
+
+	if (lock_try_acquire(&vi->map_locks[pos_cur.row][pos_cur.col])) {
+		/* got current position lock */
+		if (try_lock_crossroad(pos_next, start, dest, step+1, vi)) {
+			/* got next position lock */
+			return 1;
+		} else {
+			/* failed next lock: release all */
+			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+			return 0;
+		}
+	} else {
+		/* failed to got current lock: tell caller to release all */
+		return 0;
+	}
+}
+
+/* return 0:termination, 1:success, -1:fail */
+static int try_move(int start, int dest, struct vehicle_info *vi)
+{
+	struct position pos_cur, pos_next;
+	int got_lock; 
+
+	pos_next = vehicle_path[start][dest][vi->step];
 	pos_cur = vi->position;
 
+<<<<<<< HEAD
+=======
 	
 
 	// running인데 맵 바깥으로 나가면 없애줌
+>>>>>>> main
 	if (vi->state == VEHICLE_STATUS_RUNNING) {
 		/* check termination */
 		if (is_position_outside(pos_next)) {
@@ -178,12 +230,57 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 			return 0;
 		}
 	}
+<<<<<<< HEAD
+
+	/* lock crossroad path (try to get into crossroad) */
+	if (!is_position_crossroad(pos_cur) && is_position_crossroad(pos_next)) {
+		/* try lock path */
+		got_lock = try_lock_crossroad(pos_next, start, dest, vi->step, vi);
+		/* check proceed or wait */
+		if (got_lock) {
+			/* release cur and proceed to crossroad */
+			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+			/* update position */
+			vi->position = pos_next;
+			/* check moved */
+			vi->step++;
+		} else {
+			/* wait, do not release cur */
+		}
+		goto end_turn; 
+	}
+
+	/* crossroad to crossroad (do not release lock) */
+	if (is_position_crossroad(pos_cur) && is_position_crossroad(pos_next)) {
+		vi->position = pos_next;
+		/* check moved */
+		vi->step++;
+
+		goto end_turn; 
+	}
+
+	/* about to out crossroad */
+	if (is_position_crossroad(pos_cur) && !is_position_crossroad(pos_next)) {
+		/* lock next */
+		lock_acquire(&vi->map_locks[pos_next.row][pos_next.col]);
+		/* release crossroad path */
+		release_lock_crossroad(pos_cur, start, dest, vi->step-1, vi);
+		/* proceed */
+		vi->position = pos_next;
+		/* check moved */
+		vi->step++;
+
+		goto end_turn;
+	}
+
+	/* normal path to normal path */
+=======
 	
 	/* lock next position */
 	//다음으로 갈 애 잠궈버려서 못 가도록
 	
+>>>>>>> main
 	lock_acquire(&vi->map_locks[pos_next.row][pos_next.col]);
-	
 	if (vi->state == VEHICLE_STATUS_READY) {
 		/* start this vehicle */
 		vi->state = VEHICLE_STATUS_RUNNING;
@@ -193,18 +290,26 @@ static int try_move(int start, int dest, int step, struct vehicle_info *vi)
 	}
 	/* update position */
 	vi->position = pos_next;
+<<<<<<< HEAD
+	/* check moved */
+	vi->step++;
+	
+end_turn: 
+=======
 //	sema_down(moveSema);
 	is_position_enter_intersection(vi->position);
 
 	is_position_out_intersection(vi->position);
 //	sema_up(moveSema);
 	
+>>>>>>> main
 	return 1;
 }
 
-
 void init_on_mainthread(int thread_cnt){
 	/* Called once before spawning threads */
+<<<<<<< HEAD
+=======
 	csSema = malloc(sizeof (struct semaphore));
 	intersectionSema = malloc(sizeof (struct semaphore));
 	moveSema = malloc(sizeof (struct semaphore));
@@ -213,11 +318,12 @@ void init_on_mainthread(int thread_cnt){
 	sema_init(moveSema, 1);
 	intersectionTake1.interTakeCount =0;
 	intersectionTake1.TakePath =0;
+>>>>>>> main
 }
 
 void vehicle_loop(void *_vi)
 {
-	int res;
+	int res, i;
 	int start, dest, step;
 
 	struct vehicle_info *vi = _vi;
@@ -227,15 +333,15 @@ void vehicle_loop(void *_vi)
 
 	vi->position.row = vi->position.col = -1;
 	vi->state = VEHICLE_STATUS_READY;
+	vi->step = 0;
 
-	step = 0;
+	// if (vi->id == 'a') {
+	// 	while(1){}
+	// }
+
 	while (1) {
 		/* vehicle main code */
-		res = try_move(start, dest, step, vi);
-
-		if (res == 1) {
-			step++;
-		}
+		res = try_move(start, dest, vi);
 
 		/* termination condition. */ 
 		if (res == 0) {
@@ -244,8 +350,6 @@ void vehicle_loop(void *_vi)
 
 		/* unitstep change! */
 		unitstep_changed();
-		//
-		crossroads_step++;
 	}	
 
 	/* status transition must happen before sema_up */
