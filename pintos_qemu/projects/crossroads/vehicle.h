@@ -12,6 +12,7 @@ struct vehicle_info {
 	char state;
 	char start;
 	char dest;
+	char step;
 	struct position position;
 	struct lock **map_locks;
 };
