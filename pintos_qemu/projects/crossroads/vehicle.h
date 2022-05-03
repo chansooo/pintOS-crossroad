@@ -12,9 +12,9 @@ struct vehicle_info {
 	char state;
 	char start;
 	char dest;
+	char step;
 	struct position position;
 	struct lock **map_locks;
-//	struct lock **intersection_locks;
 };
 
 void vehicle_loop(void *vi);
