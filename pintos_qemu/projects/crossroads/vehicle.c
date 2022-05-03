@@ -12,10 +12,17 @@
 */
 
 //for unit step
+struct semaphore *sema;
 struct condition con; 
 struct lock vehicle_condition_lock; 
-int remain_vehicle_count; //지금 움직이고 있는 스레드
-int whole_vehicle_count;
+int movable_vehicle_count;
+int remain_vehicle_count; //지금 움직이고 있는 스레드 수
+int whole_vehicle_count; //전체 스레드 수
+int wait_vehivle_count =0 ; // ready 상태 애들, finish 상태 애들
+int lock_vehicle_count = 0;
+//돌아가는 애 += lock 걸렸던 애들
+//remaincount = 돌아가는애 
+//기다리는애 0개로
 /* path. A:0 B:1 C:2 D:3 */
 const struct position vehicle_path[4][4][10] = {
 	/* from A */ {
@@ -123,6 +130,11 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 	pos_next = vehicle_path[start][dest][vi->step];
 	pos_cur = vi->position;
 
+	if(start == dest){ 
+		movable_vehicle_count--;
+		return 0; 
+	}
+
 	if (vi->state == VEHICLE_STATUS_RUNNING) {
 		/* check termination */
 		if (is_position_outside(pos_next)) {
@@ -130,6 +142,7 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 			vi->position.row = vi->position.col = -1;
 			/* release previous */
 			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+			movable_vehicle_count--;
 			return 0;
 		}
 	}
@@ -197,8 +210,11 @@ void init_on_mainthread(int thread_cnt){
 	/* Called once before spawning threads */
 	lock_init(&vehicle_condition_lock);
 	cond_init(&con);
+	sema = malloc(sizeof(struct semaphore));
+	sema_init(sema, 1);
 	remain_vehicle_count = thread_cnt;
 	whole_vehicle_count = thread_cnt;
+	movable_vehicle_count = thread_cnt;
 }
 
 void vehicle_loop(void *_vi)
@@ -236,7 +252,12 @@ void vehicle_loop(void *_vi)
 			//남은 카운트 0되면 모든 스레드가 움직였으니까 unitstepchanged
 			unitstep_changed();
 			cond_broadcast(&con, &vehicle_condition_lock);
-			remain_vehicle_count = whole_vehicle_count; //문제가 있음
+			movable_vehicle_count += lock_vehicle_count;
+			remain_vehicle_count = movable_vehicle_count;
+			lock_vehicle_count = 0;
+			//돌아가는 애 += lock 걸렸던 애들
+			//remaincount = 돌아가는애 
+			//기다리는애 0개로
 		}
 
 		lock_release(&vehicle_condition_lock);
