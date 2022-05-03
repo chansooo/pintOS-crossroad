@@ -17,6 +17,8 @@ struct vehicle_info {
 	struct lock **map_locks;
 };
 
+
+
 void vehicle_loop(void *vi);
 
 #endif /* __PROJECTS_PROJECT1_VEHICLE_H__ */

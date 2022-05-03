@@ -12,9 +12,8 @@
 */
 
 //for unit step
-struct semaphore *cssema;
-struct condition *con; 
-struct lock *vehicle_condition_lock;
+struct condition con; 
+struct lock vehicle_condition_lock; 
 int remain_vehicle_count; //지금 움직이고 있는 스레드
 int whole_vehicle_count;
 /* path. A:0 B:1 C:2 D:3 */
@@ -196,10 +195,8 @@ end_turn:
 
 void init_on_mainthread(int thread_cnt){
 	/* Called once before spawning threads */
-	cssema = malloc(sizeof (struct semaphore));
-	sema_init(cssema,1);
-	cond_init(con);
-	vehicle_condition_lock = malloc(sizeof(struct lock)*thread_cnt);
+	lock_init(&vehicle_condition_lock);
+	cond_init(&con);
 	remain_vehicle_count = thread_cnt;
 	whole_vehicle_count = thread_cnt;
 }
@@ -227,30 +224,27 @@ void vehicle_loop(void *_vi)
 		res = try_move(start, dest, vi);
 
 
-		/*cs */
-		sema_down(cssema);
+		/*cs(모니터) */
+		lock_acquire(&vehicle_condition_lock);
 
 		//남은 카운트가 0보다 크면 wait하는 애 1개 더 있다고 알려주고 semaup, cond_wait
 		if(remain_vehicle_count > 1){
 			remain_vehicle_count--;
-			sema_up(cssema);
-			cond_wait(con, vehicle_condition_lock);
+
+			cond_wait(&con, &vehicle_condition_lock);
 		} else{
 			//남은 카운트 0되면 모든 스레드가 움직였으니까 unitstepchanged
-
 			unitstep_changed();
-			cond_broadcast(con, vehicle_condition_lock);
+			cond_broadcast(&con, &vehicle_condition_lock);
 			remain_vehicle_count = whole_vehicle_count; //문제가 있음
-
-			sema_up(cssema);
 		}
-		
+
+		lock_release(&vehicle_condition_lock);
 		/* termination condition. */ 
 		if (res == 0) {
 			break;
 		}
 
-		sema_up(cssema);
 		/*cs */
 		/* unitstep change! */
 
