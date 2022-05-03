@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "threads/thread.h"
 #include "threads/synch.h"
@@ -7,22 +8,8 @@
 #include "projects/crossroads/map.h"
 #include "projects/crossroads/ats.h"
 
-/*
-../../utils/pintos crossroads aAC:bAC:cAC:dBD:eBD:fBD:gCA:hCA:iCA:jDB:kDB:lDB:mAB:nBC:oCD:pDA:qAD:rDC:sCB:tBA:uBA:vAD:wDC:xCB:yBC:zDA
-*/
 
-//for unit step
-struct semaphore *sema;
-struct condition con; 
-struct lock vehicle_condition_lock; 
-int movable_vehicle_count; //available. 한 턴이 끝날 때마다 lock된 애들 더해주고 remain에 값 전달 lock_wait될 때 -- return 0일 때 -- 
-int remain_vehicle_count; //남은 애들. lock_wait하기 전에 -- while문에서 cs들어가면 --, 다 끝났는지 판별
-int whole_vehicle_count; //전체 스레드 수
-int wait_vehivle_count =0 ; // remain 0 이상이면 ++
-int lock_vehicle_count = 0; // lock_wait 걸리고 나서 풀리면 ++, remain 초기화한 후에 0으로 초가화
-//돌아가는 애 += lock 걸렸던 애들
-//remaincount = 돌아가는애 
-//기다리는애 0개로
+
 /* path. A:0 B:1 C:2 D:3 */
 const struct position vehicle_path[4][4][10] = {
 	/* from A */ {
@@ -67,7 +54,6 @@ const struct position vehicle_path[4][4][10] = {
 	}
 };
 
-
 static int is_position_outside(struct position pos)
 {
 	return (pos.row == -1 || pos.col == -1);
@@ -78,15 +64,13 @@ static int is_position_crossroad(struct position pos)
 	return (2 <= pos.row && pos.row <= 4) && (2 <= pos.col && pos.col <= 4);
 }
 
-/*교차로에 있는 길 풀어달라고 요청*/
-static void release_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi) 
+static void release_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi)
 {
-	//이전 좌표 받아오기
 	struct position pos_prev = vehicle_path[start][dest][step-1];
 
-	/* release cur to all prev crossroad path in crossroad*/
+	/* release cur to all prev crossroad path */
 	if (is_position_crossroad(pos_cur)) {
-		/* release current path if lock is in current thread*/
+		/* release current path */
 		if (lock_held_by_current_thread(&vi->map_locks[pos_cur.row][pos_cur.col])) {
 			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
 		}
@@ -95,8 +79,7 @@ static void release_lock_crossroad(struct position pos_cur, int start, int dest,
 	}
 }
 
-//교차로에 있는 길 막아버리기
-static int try_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi) 
+static int try_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi)
 {
 	struct position pos_next = vehicle_path[start][dest][step+1];
 
@@ -117,12 +100,10 @@ static int try_lock_crossroad(struct position pos_cur, int start, int dest, int 
 		}
 	} else {
 		/* failed to got current lock: tell caller to release all */
-		sema_down(sema);
-		lock_vehicle_count++;
-		sema_up(sema);
 		return 0;
 	}
 }
+
 
 /* return 0:termination, 1:success, -1:fail */
 static int try_move(int start, int dest, struct vehicle_info *vi)
@@ -133,11 +114,6 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 	pos_next = vehicle_path[start][dest][vi->step];
 	pos_cur = vi->position;
 
-	if(start == dest){ 
-		movable_vehicle_count--;
-		return 0; 
-	}
-
 	if (vi->state == VEHICLE_STATUS_RUNNING) {
 		/* check termination */
 		if (is_position_outside(pos_next)) {
@@ -145,7 +121,6 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 			vi->position.row = vi->position.col = -1;
 			/* release previous */
 			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
-			movable_vehicle_count--;
 			return 0;
 		}
 	}
@@ -166,70 +141,68 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 			/* wait, do not release cur */
 		}
 		goto end_turn; 
-	} else if (is_position_crossroad(pos_cur) && is_position_crossroad(pos_next)) { /* crossroad to crossroad (do not release lock) */
+	}
+
+	/* crossroad to crossroad (do not release lock) */
+	if (is_position_crossroad(pos_cur) && is_position_crossroad(pos_next)) {
 		vi->position = pos_next;
 		/* check moved */
 		vi->step++;
-
 		goto end_turn; 
-	} else if (is_position_crossroad(pos_cur) && !is_position_crossroad(pos_next)) {	/* about to out crossroad */
-		if(!lock_try_acquire(&vi->map_locks[pos_next.row][pos_next.col])){
-			//lock acure 전처리
-			sema_down(sema);
-			remain_vehicle_count--;
-			movable_vehicle_count--;
-			sema_up(sema);
-			lock_acquire(&vi->map_locks[pos_next.row][pos_next.col]);
-			sema_down(sema);
-			lock_vehicle_count++;
-			sema_up(sema);
-		}
+	}
+
+	/* about to out crossroad */
+	if (is_position_crossroad(pos_cur) && !is_position_crossroad(pos_next)) {
 		/* lock next */
-		
+		lock_acquire(&vi->map_locks[pos_next.row][pos_next.col]);
 		/* release crossroad path */
 		release_lock_crossroad(pos_cur, start, dest, vi->step-1, vi);
 		/* proceed */
 		vi->position = pos_next;
 		/* check moved */
 		vi->step++;
-
 		goto end_turn;
 	}
 
 	/* normal path to normal path */
-	lock_acquire(&vi->map_locks[pos_next.row][pos_next.col]);
-	if (vi->state == VEHICLE_STATUS_READY) {
-		/* start this vehicle */
-		vi->state = VEHICLE_STATUS_RUNNING;
-	} else {
-		/* release current position */
-		lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+	if (lock_try_acquire(&vi->map_locks[pos_next.row][pos_next.col])) {
+		if (vi->state == VEHICLE_STATUS_READY) {
+			/* start this vehicle */
+			vi->state = VEHICLE_STATUS_RUNNING;
+		} else {
+			/* release current position */
+			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+		}
+		/* update position */
+		vi->position = pos_next;
+		/* check moved */
+		vi->step++;
 	}
-	/* update position */
-	vi->position = pos_next;
-	/* check moved */
-	vi->step++;
 	
 end_turn: 
 	return 1;
 }
 
+
+
+static struct condition waitlist;
+static struct lock waitlock; 
+static int waitcnt = 0; 
+static int threadcnt = 0;
+
 void init_on_mainthread(int thread_cnt){
 	/* Called once before spawning threads */
-	lock_init(&vehicle_condition_lock);
-	cond_init(&con);
-	sema = malloc(sizeof(struct semaphore));
-	sema_init(sema, 1);
-	remain_vehicle_count = thread_cnt;
-	whole_vehicle_count = thread_cnt;
-	movable_vehicle_count = thread_cnt;
+	cond_init(&waitlist);
+	lock_init(&waitlock);
+	waitcnt = 0;
+	threadcnt = thread_cnt;
 }
 
 void vehicle_loop(void *_vi)
 {
 	int res, i;
-	int start, dest, step;
-	step = 0;
+	int start, dest;
+
 	struct vehicle_info *vi = _vi;
 
 	start = vi->start - 'A';
@@ -247,38 +220,38 @@ void vehicle_loop(void *_vi)
 		/* vehicle main code */
 		res = try_move(start, dest, vi);
 
+		/* wait for monitor */
+		lock_acquire(&waitlock);
+		if (vi->state == VEHICLE_STATUS_READY) {
+			for (i=0; i<50; i++) {
+				res = try_move(start, dest, vi);
+			}
+		} 
 
-		/*cs(모니터) */
-		lock_acquire(&vehicle_condition_lock);
-		remain_vehicle_count--;
-		//남은 카운트가 0보다 크면 wait하는 애 1개 더 있다고 알려주고 semaup, cond_wait
-		if(remain_vehicle_count > 1){
-			
-			cond_wait(&con, &vehicle_condition_lock);
-		} else{
-			//남은 카운트 0되면 모든 스레드가 움직였으니까 unitstepchanged
+		/* synchronization code using monitor */
+		if (waitcnt == threadcnt-1) {
+			/* proceed step */
+			crossroads_step++;
+			/* unitstep change! */
 			unitstep_changed();
-			sema_down(sema);
-			movable_vehicle_count += lock_vehicle_count;
-			remain_vehicle_count = movable_vehicle_count;
-			lock_vehicle_count = 0;
-			sema_up(sema);
-			cond_broadcast(&con, &vehicle_condition_lock);
-			
-			//돌아가는 애 += lock 걸렸던 애들
-			//remaincount = 돌아가는애 
-			//기다리는애 0개로
+			/* wait thread list is full: wake all */
+			cond_broadcast(&waitlist, &waitlock);
+		} else {
+			/* wait thread list is not full: I'll wait */
+			waitcnt++;
+			cond_wait(&waitlist, &waitlock);
+			waitcnt--;
 		}
 
-		lock_release(&vehicle_condition_lock);
 		/* termination condition. */ 
 		if (res == 0) {
+			/* decrease thread count */
+			threadcnt--;
+			lock_release(&waitlock);
 			break;
 		}
-
-		/*cs */
-		/* unitstep change! */
-
+		lock_release(&waitlock);
+		thread_yield(); 
 	}	
 
 	/* status transition must happen before sema_up */
