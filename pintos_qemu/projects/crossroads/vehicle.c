@@ -258,11 +258,9 @@ void vehicle_loop(void *_vi)
 	while (1) {
 		/* vehicle main code */
 		res = try_move(start, dest, vi);
-		if (vi->state == VEHICLE_STATUS_READY) {
-			for (i=0; i<100; i++) {
-				res = try_move(start, dest, vi);
-				thread_yield();
-			}
+		if (res == 2) {
+			thread_yield();
+			res = try_move(start, dest, vi);
 		} 
 		/* wait for monitor */
 		lock_acquire(&wait_lock);
