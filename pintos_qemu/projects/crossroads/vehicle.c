@@ -111,7 +111,7 @@ static void release_lock_crossroad(struct position pos_cur, int start, int dest,
 static int try_move(int start, int dest, struct vehicle_info *vi)
 {
 	struct position pos_cur, pos_next;
-	int got_lock; 
+	int is_can_lock; 
 
 	pos_next = vehicle_path[start][dest][vi->step];
 	pos_cur = vi->position;
@@ -130,9 +130,9 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 	/* lock crossroad path (try to get into crossroad) */
 	if (!is_position_crossroad(pos_cur) && is_position_crossroad(pos_next)) {
 		/* try lock path */
-		got_lock = try_lock_crossroad(pos_next, start, dest, vi->step, vi);
+		is_can_lock = try_lock_crossroad(pos_next, start, dest, vi->step, vi);
 		/* check proceed or wait */
-		if (got_lock) {
+		if (is_can_lock) {
 			/* release cur and proceed to crossroad */
 			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
 			/* update position */
@@ -143,18 +143,12 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 			/* wait, do not release cur */
 		}
 		return 1;
-	}
-
-	/* crossroad to crossroad (do not release lock) */
-	if (is_position_crossroad(pos_cur) && is_position_crossroad(pos_next)) {
+	} else if (is_position_crossroad(pos_cur) && is_position_crossroad(pos_next)) { /* crossroad to crossroad (do not release lock) */
 		vi->position = pos_next;
 		/* check moved */
 		vi->step++;
 		return 1;
-	}
-
-	/* about to out crossroad */
-	if (is_position_crossroad(pos_cur) && !is_position_crossroad(pos_next)) {
+	}else if (is_position_crossroad(pos_cur) && !is_position_crossroad(pos_next)) { /* about to out crossroad */
 		/* lock next */
 		lock_acquire(&vi->map_locks[pos_next.row][pos_next.col]);
 		/* release crossroad path */
@@ -164,62 +158,54 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 		/* check moved */
 		vi->step++;
 		return 1;
-	}
-
-	/* normal path to normal path */
-	if (lock_try_acquire(&vi->map_locks[pos_next.row][pos_next.col])) {
-		if (vi->state == VEHICLE_STATUS_READY) {
-			/* start this vehicle */
-			vi->state = VEHICLE_STATUS_RUNNING;
-		} else {
-			/* release current position */
-			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+	}else {
+		/* normal path to normal path */
+		if (lock_try_acquire(&vi->map_locks[pos_next.row][pos_next.col])) {
+			if (vi->state == VEHICLE_STATUS_READY) {
+				/* start this vehicle */
+				vi->state = VEHICLE_STATUS_RUNNING;
+			} else {
+				/* release current position */
+				lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+			}
+			/* update position */
+			vi->position = pos_next;
+			/* check moved */
+			vi->step++;
+			return 1;
 		}
-		/* update position */
-		vi->position = pos_next;
-		/* check moved */
-		vi->step++;
 	}
 }
 
 
 
-static struct condition waitlist;
-static struct lock waitlock; 
-static int waitcnt = 0; 
-static int threadcnt = 0;
+static struct condition waiters;
+static struct lock wait_lock; 
+static int waitcnt; 
+static int threadcnt;
 
 void init_on_mainthread(int thread_cnt){
 	/* Called once before spawning threads */
-	cond_init(&waitlist);
-	lock_init(&waitlock);
+	cond_init(&waiters);
+	lock_init(&wait_lock);
 	waitcnt = 0;
+	threadcnt =0;
 	threadcnt = thread_cnt;
 }
 
-void vehicle_loop(void *_vi)
-{
-	int res, i;
-	int start, dest;
-
+void vehicle_main_process(int start, int dest, void *_vi){
 	struct vehicle_info *vi = _vi;
-
-	start = vi->start - 'A';
-	dest = vi->dest - 'A';
-
-	vi->position.row = vi->position.col = -1;
-	vi->state = VEHICLE_STATUS_READY;
-	vi->step = 0;
-
+	int i, res;
 	while (1) {
 		/* vehicle main code */
 		res = try_move(start, dest, vi);
 
 		/* wait for monitor */
-		lock_acquire(&waitlock);
+		lock_acquire(&wait_lock);
 		if (vi->state == VEHICLE_STATUS_READY) {
-			for (i=0; i<50; i++) {
+			for (i=0; i<20; i++) {
 				res = try_move(start, dest, vi);
+				thread_yield();
 			}
 		} 
 
@@ -230,11 +216,11 @@ void vehicle_loop(void *_vi)
 			/* unitstep change! */
 			unitstep_changed();
 			/* wait thread list is full: wake all */
-			cond_broadcast(&waitlist, &waitlock);
+			cond_broadcast(&waiters, &wait_lock);
 		} else {
 			/* wait thread list is not full: I'll wait */
 			waitcnt++;
-			cond_wait(&waitlist, &waitlock);
+			cond_wait(&waiters, &wait_lock);
 			waitcnt--;
 		}
 
@@ -242,12 +228,29 @@ void vehicle_loop(void *_vi)
 		if (res == 0) {
 			/* decrease thread count */
 			threadcnt--;
-			lock_release(&waitlock);
+			lock_release(&wait_lock);
 			break;
 		}
-		lock_release(&waitlock);
+		lock_release(&wait_lock);
 		thread_yield(); 
 	}	
+}
+
+void vehicle_loop(void *_vi)
+{
+	
+	int start, dest;
+	struct vehicle_info *vi = _vi;
+	
+
+	start = vi->start - 'A';
+	dest = vi->dest - 'A';
+
+	vi->position.row = vi->position.col = -1;
+	vi->state = VEHICLE_STATUS_READY;
+	vi->step = 0;
+
+	vehicle_main_process(start, dest, &_vi);	
 
 	/* status transition must happen before sema_up */
 	vi->state = VEHICLE_STATUS_FINISHED;
