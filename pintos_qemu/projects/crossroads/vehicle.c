@@ -64,20 +64,6 @@ static int is_position_crossroad(struct position pos)
 	return (2 <= pos.row && pos.row <= 4) && (2 <= pos.col && pos.col <= 4);
 }
 
-static void release_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi)
-{
-	struct position pos_prev = vehicle_path[start][dest][step-1];
-
-	/* release cur to all prev crossroad path */
-	if (is_position_crossroad(pos_cur)) {
-		/* release current path */
-		if (lock_held_by_current_thread(&vi->map_locks[pos_cur.row][pos_cur.col])) {
-			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
-		}
-		/* release prev path */
-		release_lock_crossroad(pos_prev, start, dest, step-1, vi);
-	}
-}
 
 static int try_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi)
 {
@@ -103,6 +89,22 @@ static int try_lock_crossroad(struct position pos_cur, int start, int dest, int 
 		return 0;
 	}
 }
+
+static void release_lock_crossroad(struct position pos_cur, int start, int dest, int step, struct vehicle_info *vi)
+{
+	struct position pos_prev = vehicle_path[start][dest][step-1];
+
+	/* release cur to all prev crossroad path */
+	if (is_position_crossroad(pos_cur)) {
+		/* release current path */
+		if (lock_held_by_current_thread(&vi->map_locks[pos_cur.row][pos_cur.col])) {
+			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+		}
+		/* release prev path */
+		release_lock_crossroad(pos_prev, start, dest, step-1, vi);
+	}
+}
+
 
 
 /* return 0:termination, 1:success, -1:fail */
@@ -140,7 +142,7 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 		} else {
 			/* wait, do not release cur */
 		}
-		goto end_turn; 
+		return 1;
 	}
 
 	/* crossroad to crossroad (do not release lock) */
@@ -148,7 +150,7 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 		vi->position = pos_next;
 		/* check moved */
 		vi->step++;
-		goto end_turn; 
+		return 1;
 	}
 
 	/* about to out crossroad */
@@ -161,7 +163,7 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 		vi->position = pos_next;
 		/* check moved */
 		vi->step++;
-		goto end_turn;
+		return 1;
 	}
 
 	/* normal path to normal path */
@@ -178,9 +180,6 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 		/* check moved */
 		vi->step++;
 	}
-	
-end_turn: 
-	return 1;
 }
 
 
@@ -211,10 +210,6 @@ void vehicle_loop(void *_vi)
 	vi->position.row = vi->position.col = -1;
 	vi->state = VEHICLE_STATUS_READY;
 	vi->step = 0;
-
-	// if (vi->id == 'a') {
-	// 	while(1){}
-	// }
 
 	while (1) {
 		/* vehicle main code */
