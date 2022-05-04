@@ -119,10 +119,11 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 	if (vi->state == VEHICLE_STATUS_RUNNING) {
 		/* check termination */
 		if (is_position_outside(pos_next)) {
-			/* actual move */
-			vi->position.row = vi->position.col = -1;
 			/* release previous */
 			lock_release(&vi->map_locks[pos_cur.row][pos_cur.col]);
+			/* actual move */
+			vi->position.row = vi->position.col = -1;
+			
 			return 0;
 		}
 	}
@@ -173,8 +174,11 @@ static int try_move(int start, int dest, struct vehicle_info *vi)
 			/* check moved */
 			vi->step++;
 			return 1;
+		} else {
+			return 2; 
 		}
 	}
+	return 1;
 }
 
 
@@ -199,15 +203,14 @@ void vehicle_main_process(int start, int dest, void *_vi){
 	while (1) {
 		/* vehicle main code */
 		res = try_move(start, dest, vi);
+		if (res == 2) {
+			thread_yield();
+			res = try_move(start, dest, vi);
+		}
 
 		/* wait for monitor */
 		lock_acquire(&wait_lock);
-		if (vi->state == VEHICLE_STATUS_READY) {
-			for (i=0; i<20; i++) {
-				res = try_move(start, dest, vi);
-				thread_yield();
-			}
-		} 
+
 
 		/* synchronization code using monitor */
 		if (waitcnt == threadcnt-1) {
@@ -250,7 +253,46 @@ void vehicle_loop(void *_vi)
 	vi->state = VEHICLE_STATUS_READY;
 	vi->step = 0;
 
-	vehicle_main_process(start, dest, &_vi);	
+	//vehicle_main_process(start, dest, &_vi);	
+		int i, res;
+	while (1) {
+		/* vehicle main code */
+		res = try_move(start, dest, vi);
+		if (vi->state == VEHICLE_STATUS_READY) {
+			for (i=0; i<100; i++) {
+				res = try_move(start, dest, vi);
+				thread_yield();
+			}
+		} 
+		/* wait for monitor */
+		lock_acquire(&wait_lock);
+
+
+		/* synchronization code using monitor */
+		if (waitcnt == threadcnt-1) {
+			/* proceed step */
+			crossroads_step++;
+			/* unitstep change! */
+			unitstep_changed();
+			/* wait thread list is full: wake all */
+			cond_broadcast(&waiters, &wait_lock);
+		} else {
+			/* wait thread list is not full: I'll wait */
+			waitcnt++;
+			cond_wait(&waiters, &wait_lock);
+			waitcnt--;
+		}
+
+		/* termination condition. */ 
+		if (res == 0) {
+			/* decrease thread count */
+			threadcnt--;
+			lock_release(&wait_lock);
+			break;
+		}
+		lock_release(&wait_lock);
+		thread_yield(); 
+	}	
 
 	/* status transition must happen before sema_up */
 	vi->state = VEHICLE_STATUS_FINISHED;
